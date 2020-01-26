@@ -21,12 +21,15 @@ import android.os.Build;
 import android.os.Bundle;
 import androidx.core.app.NotificationCompat;
 import android.util.Log;
+import android.content.pm.ResolveInfo;
+import android.content.pm.PackageManager;
 
 import com.facebook.react.bridge.ReadableMap;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import java.util.List;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -37,6 +40,7 @@ import static com.dieam.reactnativepushnotification.modules.RNPushNotificationAt
 
 public class RNPushNotificationHelper {
     public static final String PREFERENCES_KEY = "rn_push_notification";
+    public static final String CUSTOM_NOTIFICATION_CATEGORY = "com.dieam.reactnativepushnotification.intent.category.NOTIFY";
     private static final long DEFAULT_VIBRATION = 300L;
     private static final String NOTIFICATION_CHANNEL_ID = "rn-push-notification-channel-id";
 
@@ -53,10 +57,35 @@ public class RNPushNotificationHelper {
         this.scheduledNotificationsPersistence = context.getSharedPreferences(RNPushNotificationHelper.PREFERENCES_KEY, Context.MODE_PRIVATE);
     }
 
+    private static String getCustomNotificationActivityClassName(Context context) {
+        PackageManager pm = context.getPackageManager();
+
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(CUSTOM_NOTIFICATION_CATEGORY);
+
+        List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
+        for (ResolveInfo resolveInfo : resolveInfos) {
+            String pkgName = resolveInfo.activityInfo.applicationInfo.packageName;
+            if (pkgName.equalsIgnoreCase(context.getPackageName())) {
+                String className = resolveInfo.activityInfo.name;
+                return className;
+            }
+        }
+        return null;
+    }
+
+    private static String getLauncherClassName(Context context) {
+      String packageName = context.getPackageName();
+      Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+      String className = launchIntent.getComponent().getClassName();
+
+      return launchIntent.getComponent().getClassName();
+    }
+  
     public Class getMainActivityClass() {
-        String packageName = context.getPackageName();
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-        String className = launchIntent.getComponent().getClassName();
+        String customIntentClassName = getCustomNotificationActivityClassName(context);
+        String launchIntentClassName = getLauncherClassName(context);
+        String className = customIntentClassName == null ? launchIntentClassName : customIntentClassName;
         try {
             return Class.forName(className);
         } catch (ClassNotFoundException e) {
